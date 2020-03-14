@@ -1,8 +1,15 @@
-Version 01.00.00
+Version: 01.00.00
+---
+
 Author/Developer: Terrence Houlahan, Linux Engineer F1Linux.com
-Contact:          houlahan@F1Linux.com
+---
+
 License: GPL 3.0
+---
+
 Date Released: 20200314
+---
+
 
 COMPATIBILITY:
 --------------
