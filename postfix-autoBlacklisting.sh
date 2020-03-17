@@ -5,7 +5,7 @@
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 02.00.00
+# Version: 02.10.01
 
 cat <<'EOF'> /etc/postfix/access-autoBlacklisting.sh
 #!/bin/bash
