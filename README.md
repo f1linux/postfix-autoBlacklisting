@@ -1,4 +1,4 @@
-Version: 01.00.00
+Version: 02.10.00
 ---
 
 Author/Developer: Terrence Houlahan, Linux Engineer F1Linux.com
@@ -12,7 +12,7 @@ Date Released: 20200314
 
 
 COMPATIBILITY:
---------------
+--
 Build tested and known to be compatible with: RHEL8
 Postfix version: rpm -qa|grep postfix -> postfix-3.3.1-9.el8.x86_64
 
@@ -20,21 +20,30 @@ Probably work with any version of Linux and Postfix but has only been tested wit
 Although problems unlikely YMMV if you execute this script on a different combination of Linux & Postfix.
 
 OPERATION:
-----------
+--
 This script prepends IP addresses from /var/log/maillog whose PTR record checks fail and also a static list to the /etc/postfix/access file
 ABOVE whitelisted ("OK") IPs. Thus access restrictions are enforce BEFORE permissive access grants.
 
-How Achieved: IPs from /var/log/maillog and /etc/postfix/access-list-permanent-blacklist.txt are written to /etc/postfix/access-AutoBlackList.txt.
-The comprehensive list of IPs to blacklist in /etc/postfix/access-AutoBlackList.txt are read into the array "arrayIPblacklist".
-Finally the array is processed in a loop prepending the IPs and the word " REJECT" ABOVE whitelisted IPs in /etc/postfix/access.
-Script finishes by deleting file "/etc/postfix/access-AutoBlackList.txt" and clearing array.
+A SystemD timer executes "/etc/postfix/access-autoBlacklisting.sh" every 60 seconds which captures offending IPs from maillog and sorts these
+into a deduplicated list named "access-AutoBlackList.txt".  Next "/etc/postfix/access" iis scanned again for IPs currently being blocked and
+these are sorted into the list "active-IP-block-list.txt".  Finally the two lists are compared using "comm" and only NEW IPs captured since the
+script previously executed are written to the file "/etc/postfix/updated-IP-block-list.txt".
 
-Housekeeping: To preclude a gazillion IPs being loaded into array each time script executes the dynamic list created from /var/log/maillog is destroyed
-and the array unset after the IPs are added to /etc/postfix/access. If the same offender is present the next time script executes their ban will continue
-until they are no longer found in /var/log/maillog. So IPs only remain blacklisted until they stop trying to connect.
+It is this last file "/etc/postfix/updated-IP-block-list.txt" that is read into an array which is looped through prepending NEW IPs to '/etc/postfix/access".
+After the "access" list is updated with any new IPs, the Berekely DB is recreated by executing "postmap /etc/postfix/access". Postfix is NOT restarted.
+After the script executes, the array is unset and all three files deleted.  When script next executes all these files will be recreated anew.
 
-Frequency:  Although script can be executed manually ideally it should be executed from a SystemD Timer at some interval you determine reasonable.
-Default execution is every 90 seconds. This limits attempts of a dodgy mailserver to make connections to just that small window befoore being blocked.
+Default Frequency:
+--
+Script executes every 60 seconds via a SystemD timer. Why 60 seconds? Seemed a reasonable interval to catch spammers. Their window is just 60 seconds for
+nonsense before being blocked.
+
+Housekeeping:
+--
+Presently there is none: Once an IP is blocked it stays blocked. Depending on how active spammers are connecting to your mailserver you may need to purge
+the /etc/postfix/access list daily, weekly, monthly or yearly. I'll revisit this at some point and code the balance between an infinite block list and
+potentially letting the same troublemakers through to start making malicious nonsense potentially in the future.
+
 
 Detailed guidance on operation of /etc/postfix/acces:
       http://www.postfix.org/access.5.html
