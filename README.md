@@ -1,14 +1,14 @@
-Version: 02.10.01
----
+# Version: 02.20.00
+----
 
-Author/Developer: Terrence Houlahan, Linux Engineer F1Linux.com
----
+Author/Developer: Terrence Houlahan Linux Engineer F1Linux.com
+----
 
 License: GPL 3.0
----
+----
 
 Date Released: 20200314
----
+----
 
 
 COMPATIBILITY:
@@ -49,10 +49,11 @@ Detailed guidance on operation of /etc/postfix/acces:
       http://www.postfix.org/access.5.html
 
 
-EXECUTION:
-----------
+INSTALLATION:
+--
 
-Step 1: cd ~
+Step 1: 
+	cd ~
 
 Step 2: Clone repo into your home directory on the Postfix server.
 	git clone https://github.com/f1linux/postfix-autoBlacklisting.git
@@ -64,4 +65,34 @@ Step 4: Execute the script:
 	./postfix-autoBlacklisting.sh
 
 Step 5: Might want too change the frequency the SystemD timer updates the blacklist to a longer or shorter period than the default.
+
+UPGRADING:
+--
+
+Remove all "postfix-autoBlacklisting" files with "postfix-autoBlacklisting-UNINSTALL.sh" script per "UNINSTALL" instructions below.
+Then perform a new install per "INSTALLATION" instructions above. Existing blocked IPs in "/etc/postfix/access" will not be removed.
+
+
+UNINSTALL:
+--
+
+An script to uninstall "***postfix-autoBlacklisting***" is provided for complete removal of the script, SystemD Service & Timer and incidental files:
+To uninstall "postfix-autoBlacklisting":
+
+Step 1:
+	cd ~
+
+Step 2:
+	cd postfix-autoBlacklisting
+
+Step 3:
+	./postfix-autoBlacklisting-UNINSTALL.sh	
+
+**NOTE**: 	The uninstall script does **NOT** remove an existing blacklisted IPs to ensure no unique local data is wiped.
+To remove **ALL** Blacklisted IPs from /etc/postfix/access execute:
+			
+	sed -i '/.*REJECT/d' /etc/postfix/access
 	
+Hope you find this tool useful for reducing abuse of your mailserver!
+
+	Terrence Houlahan Linux Engineer F1Linux.com
