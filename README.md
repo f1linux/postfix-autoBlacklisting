@@ -1,13 +1,9 @@
-# Version: 02.20.00
-----
-
 Author/Developer: Terrence Houlahan Linux Engineer F1Linux.com
-----
-
+Linkedin:	https://www.linkedin.com/in/terrencehoulahan
 License: GPL 3.0
-----
 
-Date Released: 20200314
+Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
+Version: 03.00.00
 ----
 
 
@@ -16,33 +12,30 @@ COMPATIBILITY:
 Build tested and known to be compatible with: RHEL8
 Postfix version: rpm -qa|grep postfix -> postfix-3.3.1-9.el8.x86_64
 
-Probably work with any version of Linux and Postfix but has only been tested with RHEL 8 and postfix-3.3.1-9.
+Probably work with any version of Linux and Postfix however only tested with RHEL 8 and postfix-3.3.1-9 so not guarantees on untested configurations.
 Although problems unlikely YMMV if you execute this script on a different combination of Linux & Postfix.
 
 OPERATION:
 --
-This script prepends IP addresses from /var/log/maillog whose PTR record checks fail and also a static list to the /etc/postfix/access file
-ABOVE whitelisted ("OK") IPs. Thus access restrictions are enforce BEFORE permissive access grants.
+This script prepends IP addresses from "/var/log/maillog" who matches one or more of a series of tests ABOVE whitelisted ("OK") IPs in "/etc/postfix/access".
+Thus access restrictions are enforced BEFORE permissive access grants.
 
-A SystemD timer executes "/etc/postfix/access-autoBlacklisting.sh" every 60 seconds which captures offending IPs from maillog and sorts these
-into a deduplicated list named "access-AutoBlackList.txt".  Next "/etc/postfix/access" iis scanned again for IPs currently being blocked and
-these are sorted into the list "active-IP-block-list.txt".  Finally the two lists are compared using "comm" and only NEW IPs captured since the
-script previously executed are written to the file "/etc/postfix/updated-IP-block-list.txt".
+A SystemD timer executes "/etc/postfix/access-autoBlacklisting.sh" at a specified interval which captures offending IPs from maillog using a series of tests and
+squirts these IPS into a sorted deduplicated array which is then written to "/etc/postfix/access" with the word "REJECT" after each IP. 
 
-It is this last file "/etc/postfix/updated-IP-block-list.txt" that is read into an array which is looped through prepending NEW IPs to '/etc/postfix/access".
-After the "access" list is updated with any new IPs, the Berekely DB is recreated by executing "postmap /etc/postfix/access". Postfix is NOT restarted.
-After the script executes, the array is unset and all three files deleted.  When script next executes all these files will be recreated anew.
 
-Default Frequency:
+Default Frequency: 90 Seconds
 --
-Script executes every 60 seconds via a SystemD timer. Why 60 seconds? Seemed a reasonable interval to catch spammers. Their window is just 60 seconds for
-nonsense before being blocked.
+Script executes every 90 seconds via a SystemD timer. Why? Seemed a reasonable interval to catch spammers to limit abuse before being blacklisted.
+Feel free to modify this value to any other figure you feel more appropriate.
+Be aware though that if you bump-up interval of script execution up to 300 seconds an abuser can hammer you that much longer before being blocked.
 
 Housekeeping:
 --
-Presently there is none: Once an IP is blocked it stays blocked. Depending on how active spammers are connecting to your mailserver you may need to purge
-the /etc/postfix/access list daily, weekly, monthly or yearly. I'll revisit this at some point and code the balance between an infinite block list and
-potentially letting the same troublemakers through to start making malicious nonsense potentially in the future.
+Basically the script that hoovers abuser IPs from maillog wipes them all from "/etc/postfix/access" on each execution and rewrites all previous IPs plus new ones.
+So as long as an offending IP remains in "/var/log/maillog" it will continue to be blocked. One kink in this logic: ALL offending IPs are cleansed immediately following log rotation.
+This is not all bad however. If an offending IP has stopped abusing at some point BEFORE log rotation thereafter it drops-off block list stopping "REJECT" list from growing infinitely.
+The block list will capture all the continuously offending IPs by next script execution. There needs to be a mechanism to drop IPs of hosts which stop abusing. Seemed the best balance.
 
 
 Detailed guidance on operation of /etc/postfix/acces:
