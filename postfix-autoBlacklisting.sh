@@ -33,6 +33,9 @@ systemctl stop Postfix-AutoBlacklisting.timer
 # Purge blacklist: Blacklist recreated each script execution capturing both previous offending IPs as well as newest ones present in logs
 sed -i '/REJECT$/d' /etc/postfix/access
 
+# Purge the scratch file:
+> /etc/postfix/access-blacklist
+
 ### Scrape log for different forms of abuse using different tests to identify abuse IPs and squirt each to same central file:
 # Enable/Disable any of below tests according to your requirements. Adding your own is easy if you use my tests which isolate offending IPs as templates.
 
