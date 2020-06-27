@@ -29,6 +29,7 @@ rm /etc/systemd/system/Postfix-AutoBlacklisting.service
 rm /etc/systemd/system/Postfix-AutoBlacklisting.timer
 rm /etc/postfix/access-autoBlacklisting.sh
 rm /etc/postfix/postfix-autoBlacklisting-UNINSTALL.sh
+rm -r /root/postfix-autoBlacklisting
 
 unset arrayIPblacklist
 
