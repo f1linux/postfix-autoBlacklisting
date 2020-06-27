@@ -15,7 +15,7 @@ cat<<'EOF'> /etc/postfix/postfix-autoBlacklisting-UNINSTALL.sh
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 03.00.00
+# Version: 03.10.00
 
 systemctl stop Postfix-AutoBlacklisting.service
 systemctl stop Postfix-AutoBlacklisting.timer
