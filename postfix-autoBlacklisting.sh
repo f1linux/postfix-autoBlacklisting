@@ -5,7 +5,7 @@
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 03.10.00
+# Version: 03.20.00
 
 cat <<'EOF'> /etc/postfix/access-autoBlacklisting.sh
 #!/bin/bash
@@ -15,7 +15,7 @@ cat <<'EOF'> /etc/postfix/access-autoBlacklisting.sh
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 03.00.00
+# Version: 03.20.00
 
 # OPERATION:
 # ----------
@@ -76,6 +76,8 @@ done
 
 # Rebuild the /etc/postfix/access Berkeley DB:
 postmap /etc/postfix/access
+
+systemctl reload postfix.service
 
 # After cycle completes and IPs written to /etc/postfix/acces we wipe array which repopulates anew upon next script execution:
 unset arrayIPblacklist
