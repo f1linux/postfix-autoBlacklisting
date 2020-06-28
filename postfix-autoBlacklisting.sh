@@ -5,7 +5,7 @@
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 02.20.00
+# Version: 03.20.00
 
 cat <<'EOF'> /etc/postfix/access-autoBlacklisting.sh
 #!/bin/bash
@@ -15,34 +15,57 @@ cat <<'EOF'> /etc/postfix/access-autoBlacklisting.sh
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 02.20.00
+# Version: 03.20.00
 
 # OPERATION:
 # ----------
-# This script prepends IP addresses from /var/log/maillog whose PTR record checks fail and also a static list to the /etc/postfix/access file
-# ABOVE whitelisted ("OK") IPs. Thus access restrictions are enforced BEFORE permissive access grants.
+# This script PREPENDS offending IP addresses from "/var/log/maillog" to "/etc/postfix/access"
+# This ensures restrictive access rules applied before permissive grants.
 # Consult README.md file for more granular detail about this script.
 
-# To negate any potential risk of creating an inconsistent state we stop the timer which executes the autoblacklist service before we modify it:
-# While the service is stopped however the existing blcklist in /etc/postfix/access will continue to be enforced.
+# Uncomment for debugging purposes if tinkering with the script
+# If you tail /var/log/messages you can see how the script behaves after the SystemD Timer kicks it off:
+#set -x
 
+# Stop timer from executing Blacklisting script: Existing blacklist in /etc/postfix/access is enforce enforced while the new blacklist rebuilds
 systemctl stop Postfix-AutoBlacklisting.timer
 
-# Capture IP addresses of senders whose PTR check fails from /var/log/maillog. Data condition the list by stripping out semicolons sorting list and deduplicating repeated IPs:
-cat /var/log/maillog | grep "does not resolve to address" | awk '{print $14}'|sed 's/://' | sort -u -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n | sed '/^$/d' > /etc/postfix/access-AutoBlackList.txt
+# Purge blacklist: Blacklist recreated each script execution capturing both previous offending IPs as well as newest ones present in logs
+sed -i '/REJECT$/d' /etc/postfix/access
 
-# Create file containing only IPs already present in "access" list:
-grep ".*REJECT" /etc/postfix/access | awk '{print $1}' | sort -u -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n | sed '/^$/d' > /etc/postfix/active-IP-block-list.txt
+# Purge the scratch file:
+> /etc/postfix/access-blacklist
 
-# Surpress duplicate IP found in "/etc/postfix/active-IP-block-list.txt" and only print unique IPs from it that do not already exist in /etc/postfix/access-AutoBlackList.txt:
-# NOTE: Since we are over-riding "comm"s default output by byte order and sorting lexographically- numbers increase in a series- we use "comm"s switch "--nocheck-order":
-# Ref: https://unix.stackexchange.com/a/573503/334294
-comm -23 --nocheck-order /etc/postfix/access-AutoBlackList.txt /etc/postfix/active-IP-block-list.txt | sort -u -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n | sed '/^$/d' > /etc/postfix/updated-IP-block-list.txt
+### Scrape log for different forms of abuse using different tests to identify abuse IPs and squirt each to same central file:
+# Enable/Disable any of below tests according to your requirements. Adding your own is easy if you use my tests which isolate offending IPs as templates.
 
-# Populate an array with only NEW IPs found in maillog from "/etc/postfix/updated-IP-block-list.txt" that are NOT already present in "/etc/postfix/access":
-readarray arrayIPblacklist < /etc/postfix/updated-IP-block-list.txt
+# TEST 1: Blacklist Zombie hosts from endlessly squirting spam: These are identified by no PTR record being set for them.
+# This test will catch both new zombies as well as those already RBLed which should serve to stop them constantly being endlessly checked against the RBL
+# IPv4 Test:
+# Below commented test was found to not be 100 perecent as accurate as the one using the awk form. Have not investigated why however.
+#grep "does not resolve to address" /var/log/maillog | grep -Eo "([0-9]{1,3}[\.]){3}[0-9]{1,3}" | sort -u >> /etc/postfix/access-blacklist
+grep "does not resolve to address" /var/log/maillog | awk 'match($0, /([0-9]{1,3}[\.]){3}[0-9]{1,3}/) {print substr($0, RSTART, RLENGTH)}' | sort -u >> /etc/postfix/access-blacklist
+# IPv6 Test:
+grep "does not resolve to address" /var/log/maillog | grep -Eo "2[0-9a-fA-F]{3}:(([0-9a-fA-F]{1,4}[:]{1,2}){1,6}[0-9a-fA-F]{1,4})" | sort -u | awk '{print "["$1"]"}' >> /etc/postfix/access-blacklist
 
-# Loop through array and prepend only NEW IPs not being currently blocked:
+
+# TEST 2: Block spammers guessing account names where they know our domain:
+# WARNING: this could potentially cause a block where an unintentional misspelling of an mail account name occured.
+# Uncomment only if you are OK with accepting such a risk:
+# IPv4 Test:
+grep "Recipient address rejected: User unknown in virtual mailbox table" /var/log/maillog | sed -rn 's/.*\[(([0-9]{,3}.){4})\].*/\1/gp' >> /etc/postfix/access-blacklist
+# IPv6 Test:
+grep "Recipient address rejected: User unknown in virtual mailbox table" /var/log/maillog | grep -Eo "2[0-9a-fA-F]{3}:(([0-9a-fA-F]{1,4}[:]{1,2}){1,6}[0-9a-fA-F]{1,4})" | sort -u | awk '{print "["$1"]"}' >> /etc/postfix/access-blacklist
+
+
+# Populate an array with sorted and depuplicated list of offending IPs scraped from maillog using foregoing tests:
+readarray arrayIPblacklist < <( cat /etc/postfix/access-blacklist | sort -u -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n | sed '/^$/d' )
+
+# If "access" is a new empty file then the subsequent "sed" will fail. Any new file will have a zero size so the '-s' test will not equal 'true'.
+# So we use negation to test "true" and echo a blank space to file. The subsequent "sed" will now execute.
+# If "access" file already has whitelist entry then the 'if' statement does nothing and "sed" which follows executes as expected for a non-empty file:
+if [ ! -s /etc/postfix/access ]; then echo "" > /etc/postfix/access; fi
+
 for i in "${arrayIPblacklist[@]}"; do
         # Write list of IPS from array to TOP of "access" file to enforce restrictions BEFORE processing whitelisted "OK" addresses:
         sed -i "1i $i" /etc/postfix/access
@@ -50,19 +73,15 @@ for i in "${arrayIPblacklist[@]}"; do
         sed -i '1s/$/ REJECT/' /etc/postfix/access
 done
 
-# Data Cleansing: Ensure "access" list is duplicate-free:
-awk -i inplace '!seen[$0]++' /etc/postfix/access
 
-# Rebuild the access Berkeley DB:
+# Rebuild the /etc/postfix/access Berkeley DB:
 postmap /etc/postfix/access
 
-# After cycle completes and IPs have been written to /etc/postfix/acces wipe the list and array which will be repopulated anew when script next executes:
-unset arrayIPblacklist
-rm /etc/postfix/access-AutoBlackList.txt
-rm /etc/postfix/active-IP-block-list.txt
-rm /etc/postfix/updated-IP-block-list.txt
+systemctl reload postfix.service
 
-systemctl restart Postfix-AutoBlacklisting.service
+# After cycle completes and IPs written to /etc/postfix/acces we wipe array which repopulates anew upon next script execution:
+unset arrayIPblacklist
+
 systemctl start Postfix-AutoBlacklisting.timer
 
 EOF
@@ -73,13 +92,14 @@ chmod 744 /etc/postfix/access-autoBlacklisting.sh
 
 cat <<EOF> /etc/systemd/system/Postfix-AutoBlacklisting.service
 [Unit]
-Description=Captures IPs of hosts from maillog who fails PTR test and auto-adds them to the Postfix access file for Blacklisting.
+Description=Postfix-AutoBlacklisting Service scrapes maillog for IPs matching abuse tests and writes each to Postfix access file with REJECT appended after it
 
 [Service]
 User=root
 Group=root
-Type=simple
+Type=oneshot
 ExecStart=/bin/bash /etc/postfix/access-autoBlacklisting.sh
+#Environment=SYSTEMD_LOG_LEVEL=debug
 
 [Install]
 WantedBy=multi-user.target
@@ -92,11 +112,11 @@ chmod 644 /etc/systemd/system/Postfix-AutoBlacklisting.service
 
 cat <<EOF> /etc/systemd/system/Postfix-AutoBlacklisting.timer
 [Unit]
-Description=Executes /etc/postfix/access-autoBlacklisting.sh
+Description=Postfix-AutoBlacklisting.timer executes /etc/postfix/access-autoBlacklisting.sh
 
 [Timer]
-# Execute script every 60 seconds which limits to just 1 minute the number of times a spammer can connect before being blocked:
-OnUnitInactiveSec=60s
+# Execute script every 90 seconds to limits number of times a spammer can connect before being blocked after this interval is reached:
+OnUnitInactiveSec=90s
 Unit=Postfix-AutoBlacklisting.service
 
 [Install]
