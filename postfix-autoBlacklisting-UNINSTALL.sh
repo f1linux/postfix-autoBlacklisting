@@ -5,7 +5,7 @@
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 03.00.00
+# Version: 03.20.00
 
 cat<<'EOF'> /etc/postfix/postfix-autoBlacklisting-UNINSTALL.sh
 #!/bin/bash
@@ -15,7 +15,7 @@ cat<<'EOF'> /etc/postfix/postfix-autoBlacklisting-UNINSTALL.sh
 
 # License: GPL 3.0
 # Source:  https://github.com/f1linux/postfix-autoBlacklisting.git
-# Version: 03.10.00
+# Version: 03.20.00
 
 systemctl stop Postfix-AutoBlacklisting.service
 systemctl stop Postfix-AutoBlacklisting.timer
@@ -36,9 +36,9 @@ unset arrayIPblacklist
 echo
 echo 'Delete any scratch files used to build the block list:'
 
-if [ -f /etc/postfix/access-AutoBlackList ]; then
-	rm /etc/postfix/access-AutoBlackList
-	echo 'Deleted/etc/postfix/access-AutoBlackList'
+if [ -f /etc/postfix/access-blacklist ]; then
+	rm /etc/postfix/access-blacklist
+	echo 'Deleted /etc/postfix/access-blacklist'
 fi
 
 # Below are left for legacy purposes- to be removed at some point in future
